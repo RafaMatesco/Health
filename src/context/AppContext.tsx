@@ -12,9 +12,6 @@ import type {
 import {
   INITIAL_USER_PROFILE,
   MOCK_FOODS,
-  INITIAL_MEAL_LOGS,
-  INITIAL_WORKOUT_CHECKINS,
-  INITIAL_BODY_METRICS,
   getTodayDateString
 } from '../services/mockData';
 
@@ -27,30 +24,32 @@ interface AppContextType {
   waterLogs: WaterLog[];
   selectedDate: string;
   setSelectedDate: (date: string) => void;
-  
-  // Auth
+
+  // Auth & Cloud State
   isAuthenticated: boolean;
   isSupabaseConfigured: boolean;
-  
+  isLoadingData: boolean;
+  user: any;
+
   // Profile
   updateProfile: (updated: Partial<UserProfile>) => void;
-  
+
   // Foods & Meals
-  addCustomFood: (food: Omit<FoodItem, 'id' | 'created_at'>) => FoodItem;
-  addMealLog: (log: Omit<MealLogItem, 'id'>) => void;
-  deleteMealLog: (id: string) => void;
-  
+  addCustomFood: (food: Omit<FoodItem, 'id' | 'created_at'>) => Promise<FoodItem | null>;
+  addMealLog: (log: Omit<MealLogItem, 'id'>) => Promise<void>;
+  deleteMealLog: (id: string) => Promise<void>;
+
   // Workouts & Calendar
-  toggleWorkoutCheckin: (dateStr: string, workoutName?: string, notes?: string) => void;
+  toggleWorkoutCheckin: (dateStr: string, workoutName?: string, notes?: string) => Promise<void>;
   isWorkoutDoneOnDate: (dateStr: string) => boolean;
   getWorkoutStreak: () => { currentStreak: number; totalMonthly: number };
-  
+
   // Body Metrics
-  addBodyMetric: (metric: Omit<BodyMetric, 'id'>) => void;
-  
+  addBodyMetric: (metric: Omit<BodyMetric, 'id'>) => Promise<void>;
+
   // Water
-  addWater: (amountMl: number, dateStr?: string) => void;
-  resetWater: (dateStr?: string) => void;
+  addWater: (amountMl: number, dateStr?: string) => Promise<void>;
+  resetWater: (dateStr?: string) => Promise<void>;
   getWaterTotal: (dateStr?: string) => number;
 
   // Summaries
@@ -67,90 +66,39 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   PROFILE: 'vital_user_profile',
-  FOODS: 'vital_custom_foods',
-  MEALS: 'vital_meal_logs',
-  WORKOUTS: 'vital_workout_checkins',
-  METRICS: 'vital_body_metrics',
-  WATER: 'vital_water_logs'
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
 
-  // Profile State
+  // Cloud State
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  // Profile State (We keep localStorage ONLY for API Keys/Supabase URL before login)
   const [profile, setProfile] = useState<UserProfile>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PROFILE);
     return saved ? JSON.parse(saved) : INITIAL_USER_PROFILE;
   });
 
-  // Foods State
-  const [foods, setFoods] = useState<FoodItem[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.FOODS);
-    if (saved) {
-      const custom: FoodItem[] = JSON.parse(saved);
-      return [...MOCK_FOODS, ...custom];
-    }
-    return MOCK_FOODS;
-  });
+  // Data States (Initialize empty, NO localStorage)
+  const [foods, setFoods] = useState<FoodItem[]>(MOCK_FOODS); 
+  const [mealLogs, setMealLogs] = useState<MealLogItem[]>([]);
+  const [workoutCheckins, setWorkoutCheckins] = useState<WorkoutCheckin[]>([]);
+  const [bodyMetrics, setBodyMetrics] = useState<BodyMetric[]>([]);
+  const [waterLogs, setWaterLogs] = useState<WaterLog[]>([]);
 
-  // Meals State
-  const [mealLogs, setMealLogs] = useState<MealLogItem[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.MEALS);
-    return saved ? JSON.parse(saved) : INITIAL_MEAL_LOGS;
-  });
-
-  // Workouts State
-  const [workoutCheckins, setWorkoutCheckins] = useState<WorkoutCheckin[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.WORKOUTS);
-    return saved ? JSON.parse(saved) : INITIAL_WORKOUT_CHECKINS;
-  });
-
-  // Metrics State
-  const [bodyMetrics, setBodyMetrics] = useState<BodyMetric[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.METRICS);
-    return saved ? JSON.parse(saved) : INITIAL_BODY_METRICS;
-  });
-
-  // Water State
-  const [waterLogs, setWaterLogs] = useState<WaterLog[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.WATER);
-    return saved ? JSON.parse(saved) : [
-      { id: 'w-log-1', amount_ml: 2250, logged_date: getTodayDateString() }
-    ];
-  });
-
-  // Persistence Effects
+  // Persistence Effects for Profile Keys Only
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
   }, [profile]);
 
-  useEffect(() => {
-    const customOnly = foods.filter(f => f.is_custom);
-    localStorage.setItem(STORAGE_KEYS.FOODS, JSON.stringify(customOnly));
-  }, [foods]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MEALS, JSON.stringify(mealLogs));
-  }, [mealLogs]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.WORKOUTS, JSON.stringify(workoutCheckins));
-  }, [workoutCheckins]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.METRICS, JSON.stringify(bodyMetrics));
-  }, [bodyMetrics]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.WATER, JSON.stringify(waterLogs));
-  }, [waterLogs]);
-
   // Auth & Supabase Setup
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
+
   const envSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
   const envSupabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-  
+
   const activeSupabaseUrl = profile.supabase_url || envSupabaseUrl;
   const activeSupabaseKey = profile.supabase_anon_key || envSupabaseKey;
   const isSupabaseConfigured = Boolean(activeSupabaseUrl && activeSupabaseKey);
@@ -161,9 +109,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (supabase) {
         supabase.auth.getSession().then(({ data: { session } }) => {
           setIsAuthenticated(!!session);
+          setUser(session?.user || null);
         });
         const { data: authListener } = supabase.auth.onAuthStateChange((_, session) => {
           setIsAuthenticated(!!session);
+          setUser(session?.user || null);
         });
         return () => {
           authListener.subscription.unsubscribe();
@@ -171,89 +121,187 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } else {
       setIsAuthenticated(false);
+      setUser(null);
     }
   }, [isSupabaseConfigured, activeSupabaseUrl, activeSupabaseKey]);
 
-  // Actions
-  const updateProfile = (updated: Partial<UserProfile>) => {
-    setProfile(prev => ({ ...prev, ...updated }));
-  };
-
-  const addCustomFood = (foodData: Omit<FoodItem, 'id' | 'created_at'>): FoodItem => {
-    const newFood: FoodItem = {
-      ...foodData,
-      id: `custom-f-${Date.now()}`,
-      is_custom: true,
-      created_at: new Date().toISOString()
-    };
-    setFoods(prev => [newFood, ...prev]);
-    return newFood;
-  };
-
-  const addMealLog = (logData: Omit<MealLogItem, 'id'>) => {
-    const newLog: MealLogItem = {
-      ...logData,
-      id: `meal-log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
-    };
-    setMealLogs(prev => [newLog, ...prev]);
-
-    if (isSupabaseConfigured && isAuthenticated) {
+  // Fetching Data from Supabase
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!isAuthenticated || !user) return;
+      
+      setIsLoadingData(true);
       const supabase = getSupabase();
-      if (supabase) {
-        supabase.from('meal_logs').insert([{
-           meal_type: newLog.meal_type,
-           food_name: newLog.food_name,
-           serving_info: newLog.serving_info,
-           calories: newLog.calories,
-           protein: newLog.protein,
-           carbs: newLog.carbs,
-           fat: newLog.fat,
-           quantity: newLog.quantity,
-           logged_at: newLog.logged_at
-        }]).then(({error}) => { if (error) console.error("Supabase sync error:", error) });
+      if (!supabase) {
+        setIsLoadingData(false);
+        return;
+      }
+
+      try {
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        if (profileData) {
+          setProfile(prev => ({
+            ...prev,
+            full_name: profileData.full_name || prev.full_name,
+            goal_type: profileData.goal_type || prev.goal_type,
+            target_calories: profileData.target_calories || prev.target_calories,
+            target_protein: profileData.target_protein || prev.target_protein,
+            target_carbs: profileData.target_carbs || prev.target_carbs,
+            target_fat: profileData.target_fat || prev.target_fat,
+            target_water_ml: profileData.target_water_ml || prev.target_water_ml,
+          }));
+        } else {
+          await supabase.from('profiles').insert([{
+            id: user.id,
+            full_name: profile.full_name,
+            goal_type: profile.goal_type,
+            target_calories: profile.target_calories,
+            target_protein: profile.target_protein,
+            target_carbs: profile.target_carbs,
+            target_fat: profile.target_fat,
+            target_water_ml: profile.target_water_ml
+          }]);
+        }
+
+        const { data: mealsData } = await supabase.from('meal_logs').select('*').eq('user_id', user.id);
+        if (mealsData) setMealLogs(mealsData);
+
+        const { data: workoutsData } = await supabase.from('workout_checkins').select('*').eq('user_id', user.id);
+        if (workoutsData) setWorkoutCheckins(workoutsData);
+
+        const { data: metricsData } = await supabase.from('body_metrics').select('*').eq('user_id', user.id);
+        if (metricsData) setBodyMetrics(metricsData);
+
+        const { data: waterData } = await supabase.from('water_logs').select('*').eq('user_id', user.id);
+        if (waterData) setWaterLogs(waterData);
+
+        const { data: foodsData } = await supabase.from('foods').select('*').or(`is_custom.eq.false,created_by.eq.${user.id}`);
+        if (foodsData) {
+          const mergedFoods = [...MOCK_FOODS];
+          foodsData.forEach((dbFood: any) => {
+            if (!mergedFoods.find(f => f.name === dbFood.name)) {
+              mergedFoods.push(dbFood);
+            }
+          });
+          setFoods(mergedFoods);
+        }
+      } catch (err) {
+        console.error("Error fetching data from Supabase:", err);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, [isAuthenticated, user]);
+
+  // Actions
+  const updateProfile = async (updated: Partial<UserProfile>) => {
+    setProfile(prev => ({ ...prev, ...updated }));
+    
+    if (isAuthenticated && user && getSupabase()) {
+      const supabase = getSupabase()!;
+      const { full_name, goal_type, target_calories, target_protein, target_carbs, target_fat, target_water_ml } = updated;
+      
+      const payload: any = {};
+      if (full_name !== undefined) payload.full_name = full_name;
+      if (goal_type !== undefined) payload.goal_type = goal_type;
+      if (target_calories !== undefined) payload.target_calories = target_calories;
+      if (target_protein !== undefined) payload.target_protein = target_protein;
+      if (target_carbs !== undefined) payload.target_carbs = target_carbs;
+      if (target_fat !== undefined) payload.target_fat = target_fat;
+      if (target_water_ml !== undefined) payload.target_water_ml = target_water_ml;
+
+      if (Object.keys(payload).length > 0) {
+        await supabase.from('profiles').update(payload).eq('id', user.id);
       }
     }
   };
 
-  const deleteMealLog = (id: string) => {
+  const addCustomFood = async (foodData: Omit<FoodItem, 'id' | 'created_at'>): Promise<FoodItem | null> => {
+    if (!isAuthenticated || !user || !getSupabase()) return null;
+    const supabase = getSupabase()!;
+    
+    const { data, error } = await supabase.from('foods').insert([{
+      ...foodData,
+      is_custom: true,
+      created_by: user.id
+    }]).select().single();
+
+    if (error || !data) {
+      console.error("Error adding food:", error);
+      return null;
+    }
+
+    setFoods(prev => [data, ...prev]);
+    return data;
+  };
+
+  const addMealLog = async (logData: Omit<MealLogItem, 'id'>) => {
+    if (!isAuthenticated || !user || !getSupabase()) return;
+    const supabase = getSupabase()!;
+
+    const payload = {
+      user_id: user.id,
+      meal_type: logData.meal_type,
+      food_id: logData.food_id,
+      food_name: logData.food_name,
+      serving_info: logData.serving_info,
+      calories: logData.calories,
+      protein: logData.protein,
+      carbs: logData.carbs,
+      fat: logData.fat,
+      quantity: logData.quantity,
+      logged_at: logData.logged_at
+    };
+
+    const { data, error } = await supabase.from('meal_logs').insert([payload]).select().single();
+    if (error) {
+      console.error("Supabase sync error:", error);
+      return;
+    }
+    setMealLogs(prev => [data, ...prev]);
+  };
+
+  const deleteMealLog = async (id: string) => {
+    if (!isAuthenticated || !user || !getSupabase()) return;
+    const supabase = getSupabase()!;
+    
+    const { error } = await supabase.from('meal_logs').delete().eq('id', id).eq('user_id', user.id);
+    if (error) {
+      console.error("Supabase delete error:", error);
+      return;
+    }
     setMealLogs(prev => prev.filter(m => m.id !== id));
   };
 
-  const toggleWorkoutCheckin = (dateStr: string, workoutName = 'Treino Concluído', notes = '') => {
+  const toggleWorkoutCheckin = async (dateStr: string, workoutName = 'Treino Concluído', notes = '') => {
+    if (!isAuthenticated || !user || !getSupabase()) return;
+    const supabase = getSupabase()!;
+
     const existing = workoutCheckins.find(w => w.workout_date === dateStr);
+    
     if (existing) {
-      setWorkoutCheckins(prev => prev.filter(w => w.workout_date !== dateStr));
+      const { error } = await supabase.from('workout_checkins').delete().eq('id', existing.id);
+      if (error) console.error("Error deleting checkin:", error);
+      else setWorkoutCheckins(prev => prev.filter(w => w.workout_date !== dateStr));
     } else {
-      const newCheckin: WorkoutCheckin = {
-        id: `workout-${Date.now()}`,
+      const { data, error } = await supabase.from('workout_checkins').insert([{
+        user_id: user.id,
         workout_date: dateStr,
         workout_name: workoutName,
-        notes: notes,
-        created_at: new Date().toISOString()
-      };
-      setWorkoutCheckins(prev => [newCheckin, ...prev]);
+        notes: notes
+      }]).select().single();
 
-      // Confetti celebration!
+      if (error) {
+        console.error("Supabase sync error:", error);
+        return;
+      }
+      setWorkoutCheckins(prev => [data, ...prev]);
+
       try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-      } catch (e) {
-        // ignore if canvas not supported
-      }
-
-      if (isSupabaseConfigured && isAuthenticated) {
-        const supabase = getSupabase();
-        if (supabase) {
-          supabase.from('workout_checkins').insert([{
-             workout_date: newCheckin.workout_date,
-             workout_name: newCheckin.workout_name,
-             notes: newCheckin.notes
-          }]).then(({error}) => { if (error) console.error("Supabase sync error:", error) });
-        }
-      }
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      } catch (e) {}
     }
   };
 
@@ -266,20 +314,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
 
-    // Total monthly count
     const totalMonthly = workoutCheckins.filter(w => {
       const d = new Date(w.workout_date + 'T00:00:00');
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     }).length;
 
-    // Calculate consecutive streak back from today/yesterday
     let streak = 0;
     let checkDate = new Date();
 
-    // Check if today is logged
     const todayStr = getTodayDateString();
     if (!isWorkoutDoneOnDate(todayStr)) {
-      // If today not logged yet, start checking from yesterday
       checkDate.setDate(checkDate.getDate() - 1);
     }
 
@@ -300,27 +344,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { currentStreak: streak, totalMonthly };
   };
 
-  const addBodyMetric = (metricData: Omit<BodyMetric, 'id'>) => {
-    const newMetric: BodyMetric = {
-      ...metricData,
-      id: `metric-${Date.now()}`
-    };
-    setBodyMetrics(prev => [newMetric, ...prev.filter(m => m.logged_at !== metricData.logged_at)]);
+  const addBodyMetric = async (metricData: Omit<BodyMetric, 'id'>) => {
+    if (!isAuthenticated || !user || !getSupabase()) return;
+    const supabase = getSupabase()!;
+
+    const { data, error } = await supabase.from('body_metrics').insert([{
+      user_id: user.id,
+      ...metricData
+    }]).select().single();
+
+    if (error) {
+      console.error("Error saving metric:", error);
+      return;
+    }
+    setBodyMetrics(prev => [data, ...prev.filter(m => m.logged_at !== metricData.logged_at)]);
   };
 
-  const addWater = (amountMl: number, dateStr = selectedDate) => {
-    setWaterLogs(prev => {
-      const existing = prev.find(w => w.logged_date === dateStr);
-      if (existing) {
-        return prev.map(w => w.logged_date === dateStr ? { ...w, amount_ml: w.amount_ml + amountMl } : w);
-      } else {
-        return [...prev, { id: `water-${Date.now()}`, amount_ml: amountMl, logged_date: dateStr }];
+  const addWater = async (amountMl: number, dateStr = selectedDate) => {
+    if (!isAuthenticated || !user || !getSupabase()) return;
+    const supabase = getSupabase()!;
+
+    const existing = waterLogs.find(w => w.logged_date === dateStr);
+    
+    if (existing) {
+      const newAmount = existing.amount_ml + amountMl;
+      const { data, error } = await supabase.from('water_logs').update({ amount_ml: newAmount }).eq('id', existing.id).select().single();
+      if (!error && data) {
+        setWaterLogs(prev => prev.map(w => w.id === existing.id ? data : w));
       }
-    });
+    } else {
+      const { data, error } = await supabase.from('water_logs').insert([{
+        user_id: user.id,
+        amount_ml: amountMl,
+        logged_date: dateStr
+      }]).select().single();
+      
+      if (!error && data) {
+        setWaterLogs(prev => [...prev, data]);
+      }
+    }
   };
 
-  const resetWater = (dateStr = selectedDate) => {
-    setWaterLogs(prev => prev.map(w => w.logged_date === dateStr ? { ...w, amount_ml: 0 } : w));
+  const resetWater = async (dateStr = selectedDate) => {
+    if (!isAuthenticated || !user || !getSupabase()) return;
+    const supabase = getSupabase()!;
+
+    const existing = waterLogs.find(w => w.logged_date === dateStr);
+    if (existing) {
+      await supabase.from('water_logs').delete().eq('id', existing.id);
+      setWaterLogs(prev => prev.filter(w => w.id !== existing.id));
+    }
   };
 
   const getWaterTotal = (dateStr = selectedDate): number => {
@@ -351,6 +424,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedDate,
       isAuthenticated,
       isSupabaseConfigured,
+      isLoadingData,
+      user,
       updateProfile,
       addCustomFood,
       addMealLog,

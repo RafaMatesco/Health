@@ -28,7 +28,7 @@ export const CreateFoodModal: React.FC<CreateFoodModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -41,7 +41,7 @@ export const CreateFoodModal: React.FC<CreateFoodModalProps> = ({
       return;
     }
 
-    const newFood = addCustomFood({
+    const newFood = await addCustomFood({
       name: name.trim(),
       serving_size: servingSize.trim() || '100g',
       calories: Number(calories),
@@ -52,7 +52,7 @@ export const CreateFoodModal: React.FC<CreateFoodModalProps> = ({
       category
     });
 
-    if (onFoodCreated) {
+    if (newFood && onFoodCreated) {
       onFoodCreated(newFood);
     }
 

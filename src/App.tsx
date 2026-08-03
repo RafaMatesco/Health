@@ -18,7 +18,7 @@ import { AuthScreen } from './components/auth/AuthScreen';
 import { useApp } from './context/AppContext';
 
 export function AppContent() {
-  const { isSupabaseConfigured, isAuthenticated } = useApp();
+  const { isSupabaseConfigured, isAuthenticated, isLoadingData } = useApp();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
 
   // Modals state
@@ -28,6 +28,17 @@ export function AppContent() {
 
   if (isSupabaseConfigured && !isAuthenticated) {
     return <AuthScreen onAuthenticated={() => {}} />;
+  }
+
+  if (isLoadingData) {
+    return (
+      <div className="min-h-screen bg-[#090d16] text-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-slate-400 font-medium">Sincronizando dados vitais...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

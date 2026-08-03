@@ -99,8 +99,8 @@ export const WeightChart: React.FC = () => {
             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
