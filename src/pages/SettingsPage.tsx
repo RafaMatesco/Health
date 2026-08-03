@@ -13,9 +13,6 @@ export const SettingsPage: React.FC = () => {
   const [targetCarbs, setTargetCarbs] = useState(String(profile.target_carbs));
   const [targetFat, setTargetFat] = useState(String(profile.target_fat));
   const [targetWater, setTargetWater] = useState(String(profile.target_water_ml));
-  
-  const [supabaseUrl, setSupabaseUrl] = useState(profile.supabase_url || '');
-  const [supabaseKey, setSupabaseKey] = useState(profile.supabase_anon_key || '');
   const [aiApiKey, setAiApiKey] = useState(profile.ai_api_key || '');
 
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -30,8 +27,6 @@ export const SettingsPage: React.FC = () => {
       target_carbs: Number(targetCarbs),
       target_fat: Number(targetFat),
       target_water_ml: Number(targetWater),
-      supabase_url: supabaseUrl,
-      supabase_anon_key: supabaseKey,
       ai_api_key: aiApiKey
     });
 
@@ -187,7 +182,7 @@ export const SettingsPage: React.FC = () => {
         <div className="glass-panel p-5 rounded-2xl space-y-4 border border-purple-500/20">
           <h3 className="font-bold text-base text-white flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-400" />
-            Integração com IA & Banco de Dados Supabase (Opcional)
+            Integração com IA (Opcional)
           </h3>
 
           <div className="space-y-3">
@@ -203,29 +198,6 @@ export const SettingsPage: React.FC = () => {
               <p className="text-[10px] text-slate-400 mt-1">
                 Se deixar em branco, o Vital utiliza o motor inteligente de leitura de texto local pré-instalado gratuitamente.
               </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/5">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Supabase Project URL</label>
-                <input
-                  type="text"
-                  value={supabaseUrl}
-                  onChange={(e) => setSupabaseUrl(e.target.value)}
-                  placeholder="https://xyz.supabase.co"
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Supabase Anon Key</label>
-                <input
-                  type="password"
-                  value={supabaseKey}
-                  onChange={(e) => setSupabaseKey(e.target.value)}
-                  placeholder="eyJhbGci..."
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
             </div>
           </div>
         </div>
