@@ -14,13 +14,21 @@ import { AiMealInputModal } from './components/nutrition/AiMealInputModal';
 import { AddFoodModal } from './components/nutrition/AddFoodModal';
 import { AddMetricModal } from './components/metrics/AddMetricModal';
 
+import { AuthScreen } from './components/auth/AuthScreen';
+import { useApp } from './context/AppContext';
+
 export function AppContent() {
+  const { isSupabaseConfigured, isAuthenticated } = useApp();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
 
   // Modals state
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isAddMealOpen, setIsAddMealOpen] = useState(false);
   const [isAddMetricOpen, setIsAddMetricOpen] = useState(false);
+
+  if (isSupabaseConfigured && !isAuthenticated) {
+    return <AuthScreen onAuthenticated={() => {}} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col md:flex-row">

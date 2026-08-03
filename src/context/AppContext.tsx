@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
+import { initSupabase, getSupabase } from '../services/supabaseClient';
 import type {
   UserProfile,
   FoodItem,
@@ -26,6 +27,10 @@ interface AppContextType {
   waterLogs: WaterLog[];
   selectedDate: string;
   setSelectedDate: (date: string) => void;
+  
+  // Auth
+  isAuthenticated: boolean;
+  isSupabaseConfigured: boolean;
   
   // Profile
   updateProfile: (updated: Partial<UserProfile>) => void;
@@ -140,6 +145,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEYS.WATER, JSON.stringify(waterLogs));
   }, [waterLogs]);
 
+  // Auth & Supabase Setup
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  const envSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const envSupabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  
+  const activeSupabaseUrl = profile.supabase_url || envSupabaseUrl;
+  const activeSupabaseKey = profile.supabase_anon_key || envSupabaseKey;
+  const isSupabaseConfigured = Boolean(activeSupabaseUrl && activeSupabaseKey);
+
+  useEffect(() => {
+    if (isSupabaseConfigured && activeSupabaseUrl && activeSupabaseKey) {
+      const supabase = initSupabase(activeSupabaseUrl, activeSupabaseKey);
+      if (supabase) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setIsAuthenticated(!!session);
+        });
+        const { data: authListener } = supabase.auth.onAuthStateChange((_, session) => {
+          setIsAuthenticated(!!session);
+        });
+        return () => {
+          authListener.subscription.unsubscribe();
+        };
+      }
+    } else {
+      setIsAuthenticated(false);
+    }
+  }, [isSupabaseConfigured, activeSupabaseUrl, activeSupabaseKey]);
+
   // Actions
   const updateProfile = (updated: Partial<UserProfile>) => {
     setProfile(prev => ({ ...prev, ...updated }));
@@ -162,6 +196,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `meal-log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
     };
     setMealLogs(prev => [newLog, ...prev]);
+
+    if (isSupabaseConfigured && isAuthenticated) {
+      const supabase = getSupabase();
+      if (supabase) {
+        supabase.from('meal_logs').insert([{
+           meal_type: newLog.meal_type,
+           food_name: newLog.food_name,
+           serving_info: newLog.serving_info,
+           calories: newLog.calories,
+           protein: newLog.protein,
+           carbs: newLog.carbs,
+           fat: newLog.fat,
+           quantity: newLog.quantity,
+           logged_at: newLog.logged_at
+        }]).then(({error}) => { if (error) console.error("Supabase sync error:", error) });
+      }
+    }
   };
 
   const deleteMealLog = (id: string) => {
@@ -191,6 +242,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       } catch (e) {
         // ignore if canvas not supported
+      }
+
+      if (isSupabaseConfigured && isAuthenticated) {
+        const supabase = getSupabase();
+        if (supabase) {
+          supabase.from('workout_checkins').insert([{
+             workout_date: newCheckin.workout_date,
+             workout_name: newCheckin.workout_name,
+             notes: newCheckin.notes
+          }]).then(({error}) => { if (error) console.error("Supabase sync error:", error) });
+        }
       }
     }
   };
@@ -287,6 +349,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       waterLogs,
       selectedDate,
       setSelectedDate,
+      isAuthenticated,
+      isSupabaseConfigured,
       updateProfile,
       addCustomFood,
       addMealLog,

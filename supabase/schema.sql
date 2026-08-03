@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   target_carbs INT DEFAULT 230,
   target_fat INT DEFAULT 70,
   target_water_ml INT DEFAULT 3000,
-  created_at TIMESTAMP WITH TIMEZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 2. Tabela de Alimentos
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS foods (
   fiber FLOAT DEFAULT 0,
   is_custom BOOLEAN DEFAULT FALSE,
   created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  created_at TIMESTAMP WITH TIMEZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 3. Registro de Refeições
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS meal_logs (
   fat FLOAT DEFAULT 0,
   quantity FLOAT NOT NULL DEFAULT 1,
   logged_at DATE DEFAULT CURRENT_DATE,
-  created_at TIMESTAMP WITH TIMEZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 4. Check-ins de Treino (Frequência)
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS workout_checkins (
   workout_date DATE NOT NULL DEFAULT CURRENT_DATE,
   workout_name TEXT DEFAULT 'Treino Geral',
   notes TEXT,
-  created_at TIMESTAMP WITH TIMEZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   CONSTRAINT unique_user_date UNIQUE(user_id, workout_date)
 );
 
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS body_metrics (
   legs_cm FLOAT,
   notes TEXT,
   logged_at DATE DEFAULT CURRENT_DATE,
-  created_at TIMESTAMP WITH TIMEZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 6. Log de Ingestão de Água Diária
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS water_logs (
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   amount_ml INT NOT NULL,
   logged_date DATE DEFAULT CURRENT_DATE,
-  created_at TIMESTAMP WITH TIMEZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Row Level Security (RLS) Policies
